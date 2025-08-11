@@ -11,5 +11,6 @@ python train.py \
  --path 5 \
  --num_nodes 50 \
  --lr 0.0001 \
- --use_top \
+ --use_mtp \
+ --n_future_tokens 4 \
  --compile

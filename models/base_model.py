@@ -112,14 +112,20 @@ class Transformer(nn.Module):
                 stacked_latents = torch.stack(latents, dim=-2)  # (B, T, n_future_tokens, D)
                 normalized_latents = self.final_layernorm(stacked_latents)
                 all_logits = self.lm_head(normalized_latents)
+                mtp_targets = torch.cat((targets, -1 * torch.ones((bsz, seq_len), dtype=torch.long, device=device)), dim=1)
+                # print(f"MTP targets sebelum : {mtp_targets.shape = }, {mtp_targets.dtype = }")
+                # print(f"{mtp_targets}")
 
-                all_labels = seq_to_mtp(targets, n_future_tokens=self.n_future_tokens)
+                mtp_targets = seq_to_mtp(mtp_targets, model_seq_len=seq_len, n_future_tokens=self.n_future_tokens)
+                # print(f"MTP targets sesudah : {mtp_targets.shape = }, {mtp_targets.dtype = }")
+                # print(f"{mtp_targets}")
+                # exit(0)
                 
                 current_loss = 0
                 for i in range(self.n_future_tokens):
                     logits = all_logits[:, :, i, :]
-                    labels = all_labels[:, :, i]
-                    current_loss += F.cross_entropy(logits.view(labels.numel(), -1), labels.view(-1), ignore_index=-1)
+                    labels = mtp_targets[:, i, :]
+                    current_loss += F.cross_entropy(logits.view(labels.numel(), -1), labels.reshape(-1), ignore_index=-1)
                 
                 loss += current_loss
                 logits = all_logits[:, :, 0, :] # For accuracy calculation, use the primary head's logits
@@ -134,7 +140,13 @@ class Transformer(nn.Module):
                 # Pad the targets to double the sequence length with -1s
                 x_final_for_top = self.final_layernorm(trunk)
                 top_targets = torch.cat((targets, -1 * torch.ones((bsz, seq_len), dtype=torch.long, device=device)), dim=1)
+                # print(f"TOP targets sebelum : {top_targets.shape = }, {top_targets.dtype = }")
+                # print(f"{top_targets}")
                 top_targets = seq_to_top(top_targets, vocab_size=self.vocab_size, window_size=seq_len, pad_token_id=-1)
+                # print(f"TOP targets sesudah : {top_targets.shape = }, {top_targets.dtype = }")
+                # print(f"{top_targets}")
+
+                # exit(0)
                 # we need to ignore the prefix tokens in the TOP loss too
                 # check at which position the prefix ends
                 prefix_end = targets[0].eq(-1).sum()
